@@ -40,6 +40,7 @@ class convert_format:
                 smi_list.append(smi)
             except:
                 print(f'Lost Smiles \n index: {idx}, ID: {dataframe["ID"][idx]}')
+                dataframe.drop([idx])
                 continue
         dataframe['Smiles'] = smi_list
         result = pd.DataFrame(dataframe, columns=['ID'] + ['Smiles'] + list(dataframe.columns[:-3]))
@@ -55,6 +56,7 @@ class convert_format:
                 smi_list.append(smi)
             except:
                 print(f'Lost Smiles \n index: {idx}, ID: {dataframe["ID"][idx]}')
+                dataframe.drop([idx])
                 continue
         dataframe['Smiles'] = smi_list
         result = pd.DataFrame(dataframe, columns=['ID'] + ['Smiles'] + list(dataframe.columns[:-3]))
