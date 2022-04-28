@@ -120,7 +120,7 @@ class convert_format:
             for column in columns:
                 print(f'{column}:\n{list(dataframe[column])}\n[type: list, length: {len(list(dataframe[column]))}]\n')
                 lst.append(list(dataframe[column]))
-            return list(np.array_split(lst, len(lst))[0][0]), list(np.array_split(lst, len(lst))[1][0])
+            return lst
 
     def abstract_rows(self, column, relation, value):
         dataframe = self.to_dataframe()
@@ -136,7 +136,7 @@ class convert_format:
         return result
 
 if __name__ == "__main__":
-    dataframe1, dataframe2 = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_columns(['PIC50_Class', 'ID'])
+    [result1, result2] = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_columns(['PIC50_Class', 'ID'])
 #    data = input(f'{list(dataframe.columns)}\n'
 #                 'Please write the condition with "column, relation, value" form.\n'
 #                 'For example: Similarity, >=, 0.6\n'
