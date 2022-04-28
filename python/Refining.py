@@ -9,12 +9,10 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import Draw, PandasTools, MolFromSmiles
 
 class convert_format:
-    def __init__(self, inputfile):
+    def __init__(self, inputfile, path=None, name=None):
         self.inputfile = inputfile
         if type(inputfile) == type(pd.DataFrame()): # input path and data when inputformat is dataframe.
             self.fm = 'dataframe'
-            path = input('PATH:')
-            name = input('NAME:')
             self.path = path
             self.name = name
         else:
@@ -110,25 +108,56 @@ class convert_format:
             img = Draw.MolsToGridImage(mols, molsPerRow=len(list(dataframe['Smiles'])),
                                        subImgSize=(250, 250), legends=structure_name)
             img.save(f"{self.path}/{self.name}_draw/{self.name}.png")
+        print(f'Your file "{self.name}" is successfully converted from {self.fm} to png file.')
 
-    def abstract(self, start=0, finish=None):
+    def abstract_columns(self, columns):
         dataframe = self.to_dataframe()
-        # select rows which you indicated from input.
-        dataframe = dataframe[start:finish]
-        # select columns you want.
-        columns = input(f'Your columns are {list(dataframe.columns)}. \n'
-                        'Which column do you want to abstract?:').split(', ')
-        if len(columns) == 1:
-            columns = columns[0]
+        if type(columns) == str:
             print(f'{list(dataframe[columns])}\n[type: list, length: {len(list(dataframe[columns]))}]')
             return list(dataframe[columns])
         else:
-            result = pd.DataFrame(dataframe, columns=columns)
-            print(f'{result}\n[type: dataframe, length: {len(result)}]')
-            return result
+            lst = []
+            for column in columns:
+                print(f'{column}:\n{list(dataframe[column])}\n[type: list, length: {len(list(dataframe[column]))}]\n')
+                lst.append(list(dataframe[column]))
+            return list(np.array_split(lst, len(lst))[0][0]), list(np.array_split(lst, len(lst))[1][0])
+
+    def abstract_rows(self, column, relation, value):
+        dataframe = self.to_dataframe()
+        result = []
+        values = []
+        try:
+            values = values + value
+        except:
+            values.append(value)
+        for v in values:
+            new = dataframe[eval('dataframe[column]' + " " + relation + " " + 'v')]
+            result.append(new)
+        return result
 
 if __name__ == "__main__":
-    #dataframe = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract()
+    dataframe1, dataframe2 = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_columns(['PIC50_Class', 'ID'])
+#    data = input(f'{list(dataframe.columns)}\n'
+#                 'Please write the condition with "column, relation, value" form.\n'
+#                 'For example: Similarity, >=, 0.6\n'
+#                 'You can also input many values.')
+#    column = data.split(', ')[0]
+#    relation = data.split(', ')[1]
+#    value = []
+#    result = []
+#    try:
+#        value = value + data.split(', ')[2:]
+#    except:
+#        value.append(data.split(', ')[2:])
+#    for idx, v in enumerate(value):
+#        try:
+#            v = int(v)
+#        except:
+#            pass
+#        new = dataframe[eval('dataframe[column]' + " " + relation + " " + 'v')]
+#        result.append(new)
+#    print(result)
+#    len(result)
     #dataframe = pd.read_excel('D:/New_Target/ULK1/ULK1_purecompounds.xlsx')
     #dataframe_to_sdf(dataframe)
     #dataframe = convert_format('D:/python_coding_files/OTAVA_90_IRAK4_ACD.sdf').sdf_to_dataframe()
@@ -136,5 +165,4 @@ if __name__ == "__main__":
     #df = pd.DataFrame()
     #type(dataframe) == type(pd.DataFrame())
     #type(1) == int
-    #convert_format(dataframe).to_png()
-    convert_format(dataframe).to_png()
+    #type({})
