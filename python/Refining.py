@@ -10,8 +10,7 @@ from rdkit.Chem import Draw, PandasTools, MolFromSmiles
 
 class convert_format:
     def __init__(self, inputfile, path=None, name=None):
-        self.inputfile = inputfile
-        if type(inputfile) == type(pd.DataFrame()): # input path and data when inputformat is dataframe.
+        if type(inputfile) == type(pd.DataFrame()): # input path and data when input format is dataframe.
             self.fm = 'dataframe'
             self.path = path
             self.name = name
@@ -23,21 +22,19 @@ class convert_format:
             self.path = path
             self.name = name
             self.fm = fm
-
-    def to_dataframe(self, sep='\t'): # convert your file to dataframe regardless of the file format.
-        if type(self.inputfile) == type(pd.DataFrame()):
-            dataframe = self.inputfile
+        if type(inputfile) == type(pd.DataFrame()):
+            dataframe = inputfile
             dataframe = dataframe.loc[:, ~dataframe.columns.str.contains('^Unnamed')]
-            return dataframe
+            self.dataframe = dataframe
         elif self.fm == 'txt':
-            dataframe = pd.read_csv(self.inputfile, sep=sep)
-            return dataframe
+            dataframe = pd.read_csv(inputfile, sep=sep)
+            self.dataframe = dataframe
         elif self.fm == 'xlsx':
-            dataframe = pd.read_excel(self.inputfile)
+            dataframe = pd.read_excel(inputfile)
             dataframe = dataframe.loc[:, ~dataframe.columns.str.contains('^Unnamed')]
-            return dataframe
+            self.dataframe = dataframe
         elif self.fm == 'sdf':
-            dataframe = PandasTools.LoadSDF(self.inputfile)
+            dataframe = PandasTools.LoadSDF(inputfile)
             smi_list = []
             for idx, mol in enumerate(list(dataframe['ROMol'])):
                 try:
@@ -49,22 +46,36 @@ class convert_format:
                     continue
             dataframe['Smiles'] = smi_list
             result = pd.DataFrame(dataframe, columns=['ID'] + ['Smiles'] + list(dataframe.columns[:-3]))
-            return result
+            self.dataframe = result
         else:
             print('This format is not available yet.')
 
+    def __call__(self, columns=None, *args, **kwargs):
+        if columns is None:
+            print(f'Your inputfile converted to dataframe.')
+        else:
+            dataframe = self.dataframe
+            if type(columns) == str:
+                return list(dataframe[columns])
+            else:
+                lst = []
+                for idx, column in enumerate(columns):
+                    lst.append(list(dataframe[column]))
+                return lst
+        return self.dataframe
+
     def to_txt(self, sep='\t'):
-        dataframe = self.to_dataframe()
+        dataframe = self.dataframe
         dataframe.to_csv(f'{self.path}/{self.name}.txt', sep=sep)
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to text file.')
 
     def to_xlsx(self):
-        dataframe = self.to_dataframe()
+        dataframe = self.dataframe
         dataframe.to_excel(f'{self.path}/{self.name}.xlsx')
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to excel file.')
 
     def to_sdf(self):
-        dataframe = self.to_dataframe()
+        dataframe = self.dataframe
         ID = input(f'Your columns are {list(dataframe.columns)}. \n' # show your columns.
                    'Which column do you want to select to ID?:')     # select ID column.
         PandasTools.AddMoleculeColumnToFrame(dataframe, 'Smiles', 'Molecule')
@@ -79,7 +90,7 @@ class convert_format:
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to sdf file.')
 
     def to_png(self):
-        dataframe = self.to_dataframe()
+        dataframe = self.dataframe
         ID = input(f'Your columns are {list(dataframe.columns)}. \n'
                    'Which column do you want to select as "ID"? [import column name]:\n'
                    'Or do you want to save only structure img? [import "only structure"]:')
@@ -110,20 +121,8 @@ class convert_format:
             img.save(f"{self.path}/{self.name}_draw/{self.name}.png")
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to png file.')
 
-    def abstract_columns(self, columns):
-        dataframe = self.to_dataframe()
-        if type(columns) == str:
-            print(f'{list(dataframe[columns])}\n[type: list, length: {len(list(dataframe[columns]))}]')
-            return list(dataframe[columns])
-        else:
-            lst = []
-            for column in columns:
-                print(f'{column}:\n{list(dataframe[column])}\n[type: list, length: {len(list(dataframe[column]))}]\n')
-                lst.append(list(dataframe[column]))
-            return lst
-
     def abstract_rows(self, column, relation, value):
-        dataframe = self.to_dataframe()
+        dataframe = self.dataframe
         result = []
         values = []
         try:
@@ -136,28 +135,13 @@ class convert_format:
         return result
 
 if __name__ == "__main__":
-    [result1, result2] = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_columns(['PIC50_Class', 'ID'])
-#    data = input(f'{list(dataframe.columns)}\n'
-#                 'Please write the condition with "column, relation, value" form.\n'
-#                 'For example: Similarity, >=, 0.6\n'
-#                 'You can also input many values.')
-#    column = data.split(', ')[0]
-#    relation = data.split(', ')[1]
-#    value = []
-#    result = []
-#    try:
-#        value = value + data.split(', ')[2:]
-#    except:
-#        value.append(data.split(', ')[2:])
-#    for idx, v in enumerate(value):
-#        try:
-#            v = int(v)
-#        except:
-#            pass
-#        new = dataframe[eval('dataframe[column]' + " " + relation + " " + 'v')]
-#        result.append(new)
-#    print(result)
-#    len(result)
+    #[result1, result2] = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_columns(['PIC50_Class', 'ID'])
+    # ID, Smiles, PIC50_Class = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx')(['ID', 'Smiles', 'PIC50_Class'])
+    # dataframe = pd.DataFrame()
+    # dataframe['ID'] = ID
+    # dataframe['Smiles'] = Smiles
+    # dataframe['PIC50_Class'] = PIC50_Class
+    #columns = 'PIC50_Class'
     #dataframe = pd.read_excel('D:/New_Target/ULK1/ULK1_purecompounds.xlsx')
     #dataframe_to_sdf(dataframe)
     #dataframe = convert_format('D:/python_coding_files/OTAVA_90_IRAK4_ACD.sdf').sdf_to_dataframe()
