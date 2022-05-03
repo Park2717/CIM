@@ -8,8 +8,10 @@ from rdkit import DataStructs
 from rdkit.Chem import AllChem
 from rdkit.Chem import Draw, PandasTools, MolFromSmiles
 
-class convert_format:
-    def __init__(self, inputfile, path=None, name=None):
+class convert_format: # You can convert format from dataframe, txt, excel, sdf to dataframe, txt, excel, sdf, png files.
+                      # And you can also refine the dataframe.
+    # initiation: from your input file, automatically set path, name and dataframe.
+    def __init__(self, inputfile, path='D:', name='new'):
         if type(inputfile) == type(pd.DataFrame()): # input path and data when input format is dataframe.
             self.fm = 'dataframe'
             self.path = path
@@ -22,18 +24,19 @@ class convert_format:
             self.path = path
             self.name = name
             self.fm = fm
+        # Make your input to dataframe.
         if type(inputfile) == type(pd.DataFrame()):
             dataframe = inputfile
             dataframe = dataframe.loc[:, ~dataframe.columns.str.contains('^Unnamed')]
             self.dataframe = dataframe
         elif self.fm == 'txt':
-            dataframe = pd.read_csv(inputfile, sep=sep)
+            dataframe = pd.read_csv(inputfile, sep='\t')
             self.dataframe = dataframe
         elif self.fm == 'xlsx':
             dataframe = pd.read_excel(inputfile)
             dataframe = dataframe.loc[:, ~dataframe.columns.str.contains('^Unnamed')]
             self.dataframe = dataframe
-        elif self.fm == 'sdf':
+        elif (self.fm == 'sdf') or (self.fm == 'sd'):
             dataframe = PandasTools.LoadSDF(inputfile)
             smi_list = []
             for idx, mol in enumerate(list(dataframe['ROMol'])):
@@ -49,19 +52,9 @@ class convert_format:
             self.dataframe = result
         else:
             print('This format is not available yet.')
+    # return you a dataframe if you import "convert_format('inputfile')()". Or you can list columns if you want.
+    def __call__(self, *args, **kwargs):
 
-    def __call__(self, columns=None, *args, **kwargs):
-        if columns is None:
-            print(f'Your inputfile converted to dataframe.')
-        else:
-            dataframe = self.dataframe
-            if type(columns) == str:
-                return list(dataframe[columns])
-            else:
-                lst = []
-                for idx, column in enumerate(columns):
-                    lst.append(list(dataframe[column]))
-                return lst
         return self.dataframe
 
     def to_txt(self, sep='\t'):
@@ -121,9 +114,38 @@ class convert_format:
             img.save(f"{self.path}/{self.name}_draw/{self.name}.png")
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to png file.')
 
+class dataframe_calculator:
+    def __init__(self, df1):
+        self.df1 = df1
+
+    def intersection(self, df2):
+        s1 = set(list(self.df1.columns))
+        s2 = set(list(df2.columns))
+        columns = list(s1 & s2)
+        self.df1 = pd.merge(self.df1[columns], df2[columns], how='inner')
+        return self.df1
+
+    def sub(self, df2):
+        s1 = set(list(self.df1.columns))
+        s2 = set(list(df2.columns))
+        columns = list(s1 & s2)
+        self.df1 = pd.concat([self.df1[columns], df2[columns], df2[columns]]).drop_duplicates(keep=False)
+        return self.df1
+
+    def union(self, df2):
+        self.df1 = pd.merge(self.df1, df2, how='outer')
+        return self.df1
+
+    def add(self, df2):
+        s1 = set(list(self.df1.columns))
+        s2 = set(list(df2.columns))
+        columns = list(s1 & s2)
+        self.df1 = pd.merge(self.df1[columns], df2[columns], how='outer')
+        return self.df1
+
     def abstract_rows(self, column, relation, value):
-        dataframe = self.dataframe
-        result = []
+        dataframe = self.df1
+        lst = []
         values = []
         try:
             values = values + value
@@ -131,22 +153,65 @@ class convert_format:
             values.append(value)
         for v in values:
             new = dataframe[eval('dataframe[column]' + " " + relation + " " + 'v')]
-            result.append(new)
-        return result
+            lst.append(new)
+        for df in lst:
+            df.reset_index(drop=True, inplace=True)
+        return lst
+
+    def abstract_columns(self, columns):
+        dataframe = self.df1
+        if type(columns) == str:
+            return list(dataframe[columns])
+        else:
+            lst = []
+            for idx, column in enumerate(columns):
+                lst.append(list(dataframe[column]))
+            return lst
 
 if __name__ == "__main__":
-    #[result1, result2] = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_columns(['PIC50_Class', 'ID'])
-    # ID, Smiles, PIC50_Class = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx')(['ID', 'Smiles', 'PIC50_Class'])
-    # dataframe = pd.DataFrame()
-    # dataframe['ID'] = ID
-    # dataframe['Smiles'] = Smiles
-    # dataframe['PIC50_Class'] = PIC50_Class
-    #columns = 'PIC50_Class'
-    #dataframe = pd.read_excel('D:/New_Target/ULK1/ULK1_purecompounds.xlsx')
-    #dataframe_to_sdf(dataframe)
-    #dataframe = convert_format('D:/python_coding_files/OTAVA_90_IRAK4_ACD.sdf').sdf_to_dataframe()
-    #print(dataframe)
-    #df = pd.DataFrame()
-    #type(dataframe) == type(pd.DataFrame())
-    #type(1) == int
-    #type({})
+    # Ex1) excel to sdf
+    convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').to_sdf()
+
+    # Ex2) sdf to excel
+    convert_format('D:/New_Target/ULK1/ULK1_purecompounds.sdf').to_xlsx()
+
+    # Ex3) excel to png
+    convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').to_png()
+
+    # Ex4) sdf to dataframe
+    dataframe = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.sdf')()
+
+    # Ex5) dataframe to png
+    convert_format(dataframe).to_png()
+
+    # Ex6) Abstract columns from data
+    ID, Smiles, PIC50_Class = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx')(['ID', 'Smiles', 'PIC50_Class'])
+
+    # Ex7) Abstract rows satisfying the condition from data
+    active = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_rows('PIC50_Class', '==', ['Range_A', 'Range_B', 'Range_C', 'Range_D'])
+    print(f'active:\n{active}')
+    inactive = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_rows('PIC50_Class', '==', 'Range_F')
+    print(f'inactive:\n{inactive}')
+
+    # 추가로 만들고 싶은 모듈
+    # Dataframe 교집합, 합집합, 빼기
+    # 조건 동시 검색
+    #dataframe = pd.DataFrame(dataframe, index=range(0, len(dataframe)))
+    #active.reset_index(drop=True, inplace=True)
+    [a,b,c,d] = dataframe_calculator(dataframe).abstract_rows('Standard Type', '==', ['IC50', 'Ki', 'Kd', 'Inhibition'])
+    list(b.values) == True
+    # if list(a.values):
+    #     print('a')
+    # elif list(b.values):
+    #     print('b')
+    # elif list(c.values):
+    #     print('c')
+    # else:
+    #     print('d')
+    # a.loc[list(dataframe_calculator(b).abstract_rows()]
+    # b.loc[0]
+    #
+    # multiple = (lambda x: 1+(100-x)*(100-x))
+    # multiple(2)
+    #
+    # dataframe_calculator(a).add(b)
