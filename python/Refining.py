@@ -54,17 +54,16 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
             print('This format is not available yet.')
     # return you a dataframe if you import "convert_format('inputfile')()". Or you can list columns if you want.
     def __call__(self, *args, **kwargs):
-
         return self.dataframe
 
     def to_txt(self, sep='\t'):
         dataframe = self.dataframe
-        dataframe.to_csv(f'{self.path}/{self.name}.txt', sep=sep)
+        dataframe.to_csv(f'{self.path}/{self.name}.txt', sep=sep, index=False)
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to text file.')
 
     def to_xlsx(self):
         dataframe = self.dataframe
-        dataframe.to_excel(f'{self.path}/{self.name}.xlsx')
+        dataframe.to_excel(f'{self.path}/{self.name}.xlsx', index=False)
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to excel file.')
 
     def to_sdf(self):
@@ -102,10 +101,16 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
             split = input(f'The file have {len(dataframe)} structures.\n'
                           'How many structures do you want to include in one png file?:')
             lst = np.array_split(dataframe, math.ceil(len(dataframe) / int(split)))
+            n=0
             for idx, i in enumerate(lst):
                 mols = [MolFromSmiles(mol) for mol in list(i['Smiles'])]
-                img = Draw.MolsToGridImage(mols, molsPerRow=4,
-                                           subImgSize=(250, 250), legends=structure_name)
+                if structure_name:
+                    img = Draw.MolsToGridImage(mols, molsPerRow=4,
+                                               subImgSize=(250, 250), legends=structure_name[n:n+len(i)])
+                    n+=len(i)
+                else:
+                    img = Draw.MolsToGridImage(mols, molsPerRow=4,
+                                               subImgSize=(250, 250), legends=structure_name)
                 img.save(f"{self.path}/{self.name}_draw/{self.name}_{idx}.png")
         else:
             mols = [MolFromSmiles(mol) for mol in list(dataframe['Smiles'])]
@@ -169,49 +174,26 @@ class dataframe_calculator:
             return lst
 
 if __name__ == "__main__":
-    # Ex1) excel to sdf
-    convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').to_sdf()
-
-    # Ex2) sdf to excel
-    convert_format('D:/New_Target/ULK1/ULK1_purecompounds.sdf').to_xlsx()
+    # # Ex1) excel to sdf
+    # convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').to_sdf()
+    #
+    # # Ex2) sdf to excel
+    # convert_format('D:/New_Target/ULK1/ULK1_purecompounds.sdf').to_xlsx()
 
     # Ex3) excel to png
     convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').to_png()
 
-    # Ex4) sdf to dataframe
-    dataframe = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.sdf')()
-
-    # Ex5) dataframe to png
-    convert_format(dataframe).to_png()
-
-    # Ex6) Abstract columns from data
-    ID, Smiles, PIC50_Class = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx')(['ID', 'Smiles', 'PIC50_Class'])
-
-    # Ex7) Abstract rows satisfying the condition from data
-    active = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_rows('PIC50_Class', '==', ['Range_A', 'Range_B', 'Range_C', 'Range_D'])
-    print(f'active:\n{active}')
-    inactive = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').abstract_rows('PIC50_Class', '==', 'Range_F')
-    print(f'inactive:\n{inactive}')
-
-    # 추가로 만들고 싶은 모듈
-    # Dataframe 교집합, 합집합, 빼기
-    # 조건 동시 검색
-    #dataframe = pd.DataFrame(dataframe, index=range(0, len(dataframe)))
-    #active.reset_index(drop=True, inplace=True)
-    [a,b,c,d] = dataframe_calculator(dataframe).abstract_rows('Standard Type', '==', ['IC50', 'Ki', 'Kd', 'Inhibition'])
-    list(b.values) == True
-    # if list(a.values):
-    #     print('a')
-    # elif list(b.values):
-    #     print('b')
-    # elif list(c.values):
-    #     print('c')
-    # else:
-    #     print('d')
-    # a.loc[list(dataframe_calculator(b).abstract_rows()]
-    # b.loc[0]
+    # # Ex4) sdf to dataframe
+    # dataframe = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.sdf')()
     #
-    # multiple = (lambda x: 1+(100-x)*(100-x))
-    # multiple(2)
+    # # Ex5) dataframe to png
+    # convert_format(dataframe).to_png()
     #
-    # dataframe_calculator(a).add(b)
+    # # Ex6) Abstract columns from data
+    # ID, Smiles, PIC50_Class = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx')(['ID', 'Smiles', 'PIC50_Class'])
+    #
+    # # Ex7) Abstract rows satisfying the condition from data
+    # active = dataframe_calculator(dataframe).abstract_rows('PIC50_Class', '==', ['Range_A', 'Range_B', 'Range_C', 'Range_D'])
+    # print(f'active:\n{active}')
+    # inactive = dataframe_calculator(dataframe).abstract_rows('PIC50_Class', '==', 'Range_F')
+    # print(f'inactive:\n{inactive}')
