@@ -32,6 +32,12 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
         elif self.fm == 'txt':
             dataframe = pd.read_csv(inputfile, sep='\t')
             self.dataframe = dataframe
+        elif self.fm == 'tsv':
+            dataframe = pd.read_csv(inputfile, sep='\t')
+            self.dataframe = dataframe
+        elif self.fm == 'csv':
+            dataframe = pd.read_csv(inputfile, sep=',')
+            self.dataframe = dataframe
         elif self.fm == 'xlsx':
             dataframe = pd.read_excel(inputfile)
             dataframe = dataframe.loc[:, ~dataframe.columns.str.contains('^Unnamed')]
@@ -52,6 +58,11 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
             self.dataframe = result
         else:
             print('This format is not available yet.')
+            self.dataframe = pd.Dataframe()
+        # unify smile codes
+        if list(self.dataframe['Smiles']):
+            self.dataframe['Smiles'] = self.dataframe['Smiles'].apply(lambda x: Chem.MolToSmiles(Chem.MolFromSmiles(x), isomericSmiles=True))
+
     # return you a dataframe if you import "convert_format('inputfile')()". Or you can list columns if you want.
     def __call__(self, *args, **kwargs):
         return self.dataframe
@@ -95,7 +106,7 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
         if ID.upper() == 'ONLY STRUCTURE':
             structure_name = None
         else:
-            structure_name = list(dataframe[ID])
+            structure_name = list(map(str, list(dataframe[ID])))
         # make splits if you want.
         if len(list(dataframe['Smiles'])) >= 5:
             split = input(f'The file have {len(dataframe)} structures.\n'
@@ -181,7 +192,8 @@ if __name__ == "__main__":
     # convert_format('D:/New_Target/ULK1/ULK1_purecompounds.sdf').to_xlsx()
 
     # Ex3) excel to png
-    convert_format('D:/New_Target/ULK1/ULK1_purecompounds.xlsx').to_png()
+    data = convert_format('D:/New_Target/ULK1/ULK1_Patent_data.xlsx')()
+    print(data)
 
     # # Ex4) sdf to dataframe
     # dataframe = convert_format('D:/New_Target/ULK1/ULK1_purecompounds.sdf')()
