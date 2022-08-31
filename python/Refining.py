@@ -4,7 +4,7 @@ import numpy as np
 import math
 from openbabel import pybel
 from rdkit import Chem
-from rdkit.Chem import Draw, MolFromSmiles
+from rdkit.Chem import Draw, MolFromSmiles, PandasTools
 
 class convert_format: # You can convert format from dataframe, txt, excel, sdf to dataframe, txt, excel, sdf, png files.
                       # And you can also refine the dataframe.
@@ -97,7 +97,7 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
             self.dataframe = pd.Dataframe()
         # unify smile codes
         if 'Smiles' in list(self.dataframe.columns):
-            self.dataframe['Smiles'] = self.dataframe['Smiles'].apply(lambda x: Chem.MolToSmiles(Chem.MolFromSmiles(x), isomericSmiles=True))
+            self.dataframe['Smiles'] = self.dataframe['Smiles'].apply(lambda x: Chem.MolToSmiles(Chem.MolFromSmiles(x), kekuleSmiles=True))
 
     # return you a dataframe if you import "convert_format('inputfile')()". Or you can list columns if you want.
     def __call__(self, *args, **kwargs):
@@ -106,13 +106,15 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
         return self.dataframe
 
     def to_txt(self, sep='\t'):
-        dataframe = self.dataframe
-        dataframe.to_csv(f'{self.path}/{self.name}.txt', sep=sep, index=False)
+        if 'ROMol' in list(self.dataframe.columns):
+            self.dataframe = self.dataframe.drop(['ROMol'], axis=1)
+        self.dataframe.to_csv(f'{self.path}/{self.name}.txt', sep=sep, index=False)
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to text file.')
 
     def to_xlsx(self):
-        dataframe = self.dataframe
-        dataframe.to_excel(f'{self.path}/{self.name}.xlsx', index=False)
+        if 'ROMol' in list(self.dataframe.columns):
+            self.dataframe = self.dataframe.drop(['ROMol'], axis=1)
+        self.dataframe.to_excel(f'{self.path}/{self.name}.xlsx', index=False)
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to excel file.')
 
     def to_sdf(self):
@@ -122,33 +124,36 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
                    'Which column do you want to select to ID?:')  # select ID column.
         auto = input('Do you want to set properties Automatically? [Y/N]:')
         if 'ROMol' in list(df.columns):
-            pass
+            for idx, id in enumerate(df[ID]):
+                new_lines += [df['ROMol'].values[idx].write('sdf')[:-6] + '\n']
+                new_lines += ['\n']
+                # if yes, input all of your propertiees except ID and Smiles.
+                if auto.upper() == 'Y':
+                    columns = [x for x in df.columns if not (x == ID or x == 'Smiles' or x == 'ROMol')]
+                # Or you can choose your properties.
+                else:
+                    columns = input('Which columns do you want to use as properties?:').split(', ')
+                for i, property in enumerate(df.columns.to_list()):
+                    if property in columns:
+                        new_lines += [f'> <{property}>\n']
+                        new_lines += [str(df.values[idx][i]) + '\n']
+                        new_lines += ['\n']
+                new_lines += ['$$$$\n']
+            w = open(f'{self.path}/{self.name}.sdf', 'w')
+            for new_line in new_lines:
+                w.write(new_line)
+            w.close()
         elif 'Smiles' in list(df.columns):
-            df['ROMol'] = df['Smiles'].apply(lambda x: pybel.readstring('smi', x))
-            df['ROMol'].apply(lambda x: x.Make2D)
-            df['ROMol'].apply(lambda x: x.removeh)
+            PandasTools.AddMoleculeColumnToFrame(df, 'Smiles', 'ROMol')
+            if auto.upper() == 'Y':
+                columns = [x for x in df.columns if not (x == ID or x == 'Smiles' or x == 'ROMol')]
+                # Or you can choose your properties.
+            else:
+                columns = input('Which columns do you want to use as properties?:').split(', ')
+            PandasTools.WriteSDF(df, f'{self.path}/{self.name}.sdf', molColName='ROMol', idName=str(ID), properties=columns)
         else:
             print(f'there is no structural information in your file "{self.name}"')
             return
-        for idx, id in enumerate(df[ID]):
-            new_lines += [df['ROMol'].values[idx].write('sdf')[:-6] + '\n']
-            new_lines += ['\n']
-            # if yes, input all of your propertiees except ID and Smiles.
-            if auto.upper() == 'Y':
-                columns = [x for x in df.columns if not (x == ID or x == 'Smiles' or x == 'ROMol')]
-            # Or you can choose your properties.
-            else:
-                columns = input('Which columns do you want to use as properties?:').split(', ')
-            for i, property in enumerate(df.columns.to_list()):
-                if property in columns:
-                    new_lines += [f'> <{property}>\n']
-                    new_lines += [str(df.values[idx][i]) + '\n']
-                    new_lines += ['\n']
-            new_lines += ['$$$$\n']
-        w = open(f'{self.path}/{self.name}.sdf', 'w')
-        for new_line in new_lines:
-            w.write(new_line)
-        w.close()
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to sdf file.')
 
     def to_mol2(self):
@@ -161,13 +166,34 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
             pass
         elif 'Smiles' in list(df.columns):
             df['ROMol'] = df['Smiles'].apply(lambda x: pybel.readstring('smi', x))
-            df['ROMol'].apply(lambda x: x.Make2D)
-            df['ROMol'].apply(lambda x: x.removeh)
+            df['ROMol'].apply(lambda x: x.make2D())
+            df['ROMol'].apply(lambda x: x.removeh())
         else:
             print(f'there is no structural information in your file "{self.name}"')
             return
         for idx, id in enumerate(df[ID]):
-            new_lines += [df['ROMol'].values[idx].write('mol2') + '\n']
+            sdf_lines = df['ROMol'].values[idx].write('sdf').split('\n')
+            for sdf_idx, sdf_line in enumerate(sdf_lines):
+                if (sdf_line.find('V2000') > 0) or (sdf_line.find('V3000') > 0):
+                    new_lines += ['@<TRIPOS>MOLECULE\n']
+                    new_lines += [id + '\n']
+                    new_lines += [sdf_lines[sdf_idx][0:15] + '\n']
+                    new_lines += ['SMALL\n']
+                    new_lines += ['GASTEIGER\n']
+                    new_lines += ['@<TRIPOS>ATOM\n']
+                    atom_num = int(sdf_lines[sdf_idx][0:3])
+                    bond_num = int(sdf_lines[sdf_idx][4:7])
+                    atom_full = sdf_lines[sdf_idx: sdf_idx + atom_num + 1]
+                    for x in range(1, atom_num +1):
+                        x = x
+                        new_lines += ['{:>6}'.format(str(x)) + atom_full[x][30:34] + '{:>14}'.format(atom_full[x][2:10]) +  atom_full[x][10:20] + atom_full[x][20:30] + atom_full[x][30:34] + '  ' + '   1  UNL1        0.0000\n']
+                if sdf_line.startswith('  1  2'):
+                    new_lines += ['@<TRIPOS>BOND\n']
+                    bond_full = sdf_lines[sdf_idx: sdf_idx + bond_num]
+                    for i in range(1, bond_num + 1):
+                        y = str(i) + bond_full[i - 1][0:12]
+                        new_lines += ['{:>6}'.format(y[:-12]) + '{:>6}'.format(y[3:-9]) + '{:>6}'.format(
+                            y[5:-6]) + '{:>5}'.format(y[9:-3]) + '\n']
             # if yes, input all of your propertiees except ID and Smiles.
             if auto.upper() == 'Y':
                 columns = [x for x in df.columns if not (x == ID or x == 'Smiles' or x == 'ROMol')]
@@ -180,14 +206,13 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
                 if str(df.values[idx][i]) == 'nan':
                     continue
                 if property in columns:
-                    new_lines += ['@(SCITEGIC)MOL_PROPERTY\n']
+                    new_lines += ['@<SCITEGIC>MOL_PROPERTY\n']
                     new_lines += [str(property).strip() + '\n']
-                    if str(type(df.values[idx][i]))[8:-2] == 'str':
-                        new_lines += ['SciTegic.value.StringValue\n']
-                    elif str(type(df.values[idx][i]))[8:-2] == 'float':
+                    try:
+                        int(df.values[idx][i])
                         new_lines += ['SciTegic.value.IntegerValue\n']
-                    else:
-                        pass
+                    except:
+                        new_lines += ['SciTegic.value.StringValue\n']
                     new_lines += [str(df.values[idx][i]) + '\n\n']
         w = open(f'{self.path}/{self.name}.mol2', 'w')
         for new_line in new_lines:
@@ -196,6 +221,8 @@ class convert_format: # You can convert format from dataframe, txt, excel, sdf t
         print(f'Your file "{self.name}" is successfully converted from {self.fm} to mol2 file.')
 
     def to_png(self):
+        if 'ROMol' in list(self.dataframe.columns):
+            self.dataframe = self.dataframe.drop(['ROMol'], axis=1)
         dataframe = self.dataframe
         ID = input(f'Your columns are {list(dataframe.columns)}. \n'
                    'Which column do you want to select as "ID"? [import column name]:\n'
